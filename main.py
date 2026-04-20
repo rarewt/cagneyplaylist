@@ -40,29 +40,49 @@ def _run_conversion(job_id: str, spotify_url: str) -> None:
     job = jobs[job_id]
     try:
         playlist_name, tracks = fetch_playlist(spotify_url)
-        job["total"] = len(tracks)
-
-        video_ids = []
-        not_found = []
-        for track in tracks:
-            vid = search_song(track["name"], track["artist"])
-            if vid:
-                video_ids.append(vid)
-            else:
-                not_found.append(f"{track['artist']} - {track['name']}")
-            job["progress"] += 1
-
-        playlist_id = create_playlist(
-            playlist_name,
-            f"Imported from Spotify playlist: {spotify_url}",
-        )
-        if video_ids:
-            add_tracks(playlist_id, video_ids)
-
-        job["result_url"] = f"https://music.youtube.com/playlist?list={playlist_id}"
-        job["not_found"] = not_found
-        job["status"] = "done"
-
     except Exception as exc:
         job["status"] = "error"
-        job["error"] = str(exc)
+        job["error"] = f"Spotify fetch failed: {exc}"
+        return
+
+    if not tracks:
+        job["status"] = "error"
+        job["error"] = "No tracks found — playlist may be empty or the Spotify embed format changed"
+        return
+
+    job["total"] = len(tracks)
+
+    video_ids = []
+    not_found = []
+    for track in tracks:
+        try:
+            vid = search_song(track["name"], track["artist"])
+        except Exception:
+            vid = None
+        if vid:
+            video_ids.append(vid)
+        else:
+            not_found.append(f"{track['artist']} - {track['name']}")
+        job["progress"] += 1
+
+    try:
+        playlist_id = create_playlist(
+            playlist_name or "Spotify Playlist",
+            f"Imported from Spotify playlist: {spotify_url}",
+        )
+    except Exception as exc:
+        job["status"] = "error"
+        job["error"] = f"Failed to create YouTube Music playlist: {exc}"
+        return
+
+    try:
+        if video_ids:
+            add_tracks(playlist_id, video_ids)
+    except Exception as exc:
+        job["status"] = "error"
+        job["error"] = f"Failed to add tracks: {exc}"
+        return
+
+    job["result_url"] = f"https://music.youtube.com/playlist?list={playlist_id}"
+    job["not_found"] = not_found
+    job["status"] = "done"
