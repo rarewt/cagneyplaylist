@@ -12,11 +12,11 @@ Steps:
 Usage:
     python setup_ytmusic.py
 """
-from ytmusicapi import YTMusic
+from ytmusicapi import setup
 
 print("Paste your request headers from DevTools below.")
-print("Press Enter twice (blank line) when done.\n")
+print("Press Ctrl-Z then Enter (Windows) or Ctrl-D (Mac/Linux) when done.\n")
 
-YTMusic.setup(filepath="headers_auth.json")
+setup(filepath="headers_auth.json")
 
 print("\nDone! headers_auth.json has been created. You can now start the server.")
