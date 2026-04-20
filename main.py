@@ -67,7 +67,10 @@ def _run_conversion(job_id: str, spotify_url: str) -> None:
         job["progress"] += 1
         time.sleep(0.15)
 
-    safe_name = (playlist_name or "").strip()[:150] or "Spotify Playlist"
+    safe_name = (playlist_name or "").strip().replace("<", "").replace(">", "")[:150] or "Spotify Playlist"
+    # deduplicate while preserving order (duplicate videoIds cause add_playlist_items to 400)
+    seen: set[str] = set()
+    video_ids = [v for v in video_ids if not (v in seen or seen.add(v))]
     try:
         playlist_id = create_playlist(
             safe_name,

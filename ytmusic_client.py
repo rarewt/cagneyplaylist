@@ -44,10 +44,10 @@ def add_tracks(playlist_id: str, video_ids: list[str]) -> None:
     for i in range(0, len(video_ids), batch_size):
         batch = video_ids[i : i + batch_size]
         try:
-            yt.add_playlist_items(playlist_id, batch, duplicates=False)
+            yt.add_playlist_items(playlist_id, batch, duplicates=True)
         except Exception:
             for vid in batch:
                 try:
-                    yt.add_playlist_items(playlist_id, [vid], duplicates=False)
+                    yt.add_playlist_items(playlist_id, [vid], duplicates=True)
                 except Exception:
                     pass
