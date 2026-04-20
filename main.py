@@ -74,6 +74,7 @@ def _run_conversion(job_id: str, spotify_url: str) -> None:
     seen: set[str] = set()
     video_ids = [v for v in video_ids if not (v in seen or seen.add(v))]
     playlist_id = None
+    last_exc: Exception | None = None
     for name_attempt, privacy_attempt in [
         (safe_name, "PRIVATE"),
         ("Spotify Playlist", "PRIVATE"),
@@ -82,11 +83,12 @@ def _run_conversion(job_id: str, spotify_url: str) -> None:
         try:
             playlist_id = create_playlist(name_attempt, "", privacy_status=privacy_attempt)
             break
-        except Exception:
+        except Exception as exc:
+            last_exc = exc
             continue
     if playlist_id is None:
         job["status"] = "error"
-        job["error"] = "Failed to create YouTube Music playlist — OAuth token may be expired (re-run setup_ytmusic.py)"
+        job["error"] = f"Failed to create YouTube Music playlist: {type(last_exc).__name__}: {last_exc}"
         return
 
     try:
