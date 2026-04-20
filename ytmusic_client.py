@@ -1,23 +1,13 @@
-import os
-from ytmusicapi import YTMusic, OAuthCredentials
-from dotenv import load_dotenv
+from ytmusicapi import YTMusic
 
-load_dotenv(override=True)
-
-OAUTH_FILE = "oauth.json"
+AUTH_FILE = "headers_auth.json"
 _yt = None
 
 
 def _client() -> YTMusic:
     global _yt
     if _yt is None:
-        _yt = YTMusic(
-            OAUTH_FILE,
-            oauth_credentials=OAuthCredentials(
-                client_id=os.environ["GOOGLE_CLIENT_ID"],
-                client_secret=os.environ["GOOGLE_CLIENT_SECRET"],
-            ),
-        )
+        _yt = YTMusic(AUTH_FILE)
     return _yt
 
 
@@ -38,7 +28,7 @@ def create_playlist(name: str, description: str = "", privacy_status: str = "PRI
 
 
 def add_tracks(playlist_id: str, video_ids: list[str]) -> None:
-    """Add video_ids to playlist in batches, falling back to one-by-one on 400."""
+    """Add video_ids to playlist in batches, falling back to one-by-one on failure."""
     yt = _client()
     batch_size = 25
     for i in range(0, len(video_ids), batch_size):
