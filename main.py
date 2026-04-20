@@ -1,4 +1,5 @@
 import uuid
+import time
 import threading
 from fastapi import FastAPI, Request, Form, HTTPException
 from fastapi.responses import HTMLResponse, JSONResponse
@@ -64,11 +65,13 @@ def _run_conversion(job_id: str, spotify_url: str) -> None:
         else:
             not_found.append(f"{track['artist']} - {track['name']}")
         job["progress"] += 1
+        time.sleep(0.15)
 
+    safe_name = (playlist_name or "").strip()[:150] or "Spotify Playlist"
     try:
         playlist_id = create_playlist(
-            playlist_name or "Spotify Playlist",
-            f"Imported from Spotify playlist: {spotify_url}",
+            safe_name,
+            f"Imported from Spotify: {spotify_url}"[:500],
         )
     except Exception as exc:
         job["status"] = "error"
