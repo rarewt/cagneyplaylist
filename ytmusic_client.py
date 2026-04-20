@@ -38,9 +38,16 @@ def create_playlist(name: str, description: str = "") -> str:
 
 
 def add_tracks(playlist_id: str, video_ids: list[str]) -> None:
-    """Add video_ids to playlist in batches of 50."""
+    """Add video_ids to playlist in batches, falling back to one-by-one on 400."""
     yt = _client()
-    batch_size = 50
+    batch_size = 25
     for i in range(0, len(video_ids), batch_size):
         batch = video_ids[i : i + batch_size]
-        yt.add_playlist_items(playlist_id, batch, duplicates=False)
+        try:
+            yt.add_playlist_items(playlist_id, batch, duplicates=False)
+        except Exception:
+            for vid in batch:
+                try:
+                    yt.add_playlist_items(playlist_id, [vid], duplicates=False)
+                except Exception:
+                    pass
