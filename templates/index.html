@@ -1,0 +1,304 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Spotify → YouTube Music</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background: #0f0f0f;
+      color: #e8e8e8;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 1.5rem;
+    }
+
+    .card {
+      background: #1a1a1a;
+      border-radius: 1.25rem;
+      padding: 2rem;
+      width: 100%;
+      max-width: 480px;
+      box-shadow: 0 4px 32px rgba(0,0,0,0.5);
+    }
+
+    h1 {
+      font-size: 1.4rem;
+      font-weight: 700;
+      margin-bottom: 0.3rem;
+    }
+
+    .subtitle {
+      font-size: 0.875rem;
+      color: #888;
+      margin-bottom: 1.75rem;
+    }
+
+    label {
+      display: block;
+      font-size: 0.8rem;
+      font-weight: 600;
+      color: #aaa;
+      margin-bottom: 0.4rem;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    input[type="url"] {
+      width: 100%;
+      padding: 0.85rem 1rem;
+      border-radius: 0.75rem;
+      border: 1.5px solid #333;
+      background: #111;
+      color: #e8e8e8;
+      font-size: 1rem;
+      outline: none;
+      transition: border-color 0.15s;
+    }
+
+    input[type="url"]:focus { border-color: #1db954; }
+
+    button {
+      margin-top: 1rem;
+      width: 100%;
+      padding: 0.9rem;
+      border-radius: 0.75rem;
+      border: none;
+      background: #1db954;
+      color: #000;
+      font-size: 1rem;
+      font-weight: 700;
+      cursor: pointer;
+      transition: background 0.15s, opacity 0.15s;
+    }
+
+    button:hover { background: #1ed760; }
+    button:disabled { opacity: 0.5; cursor: not-allowed; }
+
+    /* Progress */
+    #progress-section { display: none; margin-top: 1.5rem; }
+
+    .progress-label {
+      font-size: 0.875rem;
+      color: #aaa;
+      margin-bottom: 0.5rem;
+      display: flex;
+      justify-content: space-between;
+    }
+
+    .bar-track {
+      background: #2a2a2a;
+      border-radius: 999px;
+      height: 8px;
+      overflow: hidden;
+    }
+
+    .bar-fill {
+      height: 100%;
+      background: #1db954;
+      border-radius: 999px;
+      width: 0%;
+      transition: width 0.4s ease;
+    }
+
+    /* Result */
+    #result-section { display: none; margin-top: 1.5rem; }
+
+    .result-link {
+      display: block;
+      padding: 0.85rem 1rem;
+      border-radius: 0.75rem;
+      background: #1db95420;
+      border: 1.5px solid #1db954;
+      color: #1db954;
+      text-decoration: none;
+      font-weight: 600;
+      text-align: center;
+      word-break: break-all;
+    }
+
+    .result-link:hover { background: #1db95435; }
+
+    .not-found {
+      margin-top: 1rem;
+    }
+
+    .not-found summary {
+      font-size: 0.85rem;
+      color: #f5a623;
+      cursor: pointer;
+      padding: 0.4rem 0;
+    }
+
+    .not-found ul {
+      margin-top: 0.5rem;
+      padding-left: 1.2rem;
+      font-size: 0.8rem;
+      color: #888;
+      line-height: 1.7;
+    }
+
+    /* Error */
+    #error-section {
+      display: none;
+      margin-top: 1.5rem;
+      padding: 0.85rem 1rem;
+      border-radius: 0.75rem;
+      background: #ff4c4c18;
+      border: 1.5px solid #ff4c4c;
+      color: #ff7070;
+      font-size: 0.875rem;
+      word-break: break-word;
+    }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h1>Spotify → YouTube Music</h1>
+    <p class="subtitle">Paste a public Spotify playlist link to copy it to your YouTube Music account.</p>
+
+    <form id="convert-form">
+      <label for="spotify-url">Spotify Playlist URL</label>
+      <input
+        type="url"
+        id="spotify-url"
+        name="spotify_url"
+        placeholder="https://open.spotify.com/playlist/…"
+        required
+        autocomplete="off"
+        autocorrect="off"
+        spellcheck="false"
+      >
+      <button type="submit" id="submit-btn">Convert</button>
+    </form>
+
+    <div id="progress-section">
+      <div class="progress-label">
+        <span id="progress-text">Searching songs…</span>
+        <span id="progress-count"></span>
+      </div>
+      <div class="bar-track">
+        <div class="bar-fill" id="bar-fill"></div>
+      </div>
+    </div>
+
+    <div id="result-section">
+      <a id="result-link" class="result-link" href="#" target="_blank" rel="noopener">
+        Open your new YouTube Music playlist ↗
+      </a>
+      <details class="not-found" id="not-found-details" style="display:none">
+        <summary id="not-found-summary"></summary>
+        <ul id="not-found-list"></ul>
+      </details>
+    </div>
+
+    <div id="error-section"></div>
+  </div>
+
+  <script>
+    const form = document.getElementById('convert-form');
+    const btn = document.getElementById('submit-btn');
+    const progressSection = document.getElementById('progress-section');
+    const progressText = document.getElementById('progress-text');
+    const progressCount = document.getElementById('progress-count');
+    const barFill = document.getElementById('bar-fill');
+    const resultSection = document.getElementById('result-section');
+    const resultLink = document.getElementById('result-link');
+    const notFoundDetails = document.getElementById('not-found-details');
+    const notFoundSummary = document.getElementById('not-found-summary');
+    const notFoundList = document.getElementById('not-found-list');
+    const errorSection = document.getElementById('error-section');
+
+    function reset() {
+      progressSection.style.display = 'none';
+      resultSection.style.display = 'none';
+      errorSection.style.display = 'none';
+      notFoundDetails.style.display = 'none';
+      barFill.style.width = '0%';
+      notFoundList.innerHTML = '';
+    }
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      reset();
+      btn.disabled = true;
+      btn.textContent = 'Converting…';
+
+      const formData = new FormData(form);
+      let jobId;
+
+      try {
+        const res = await fetch('/convert', { method: 'POST', body: formData });
+        if (!res.ok) throw new Error(await res.text());
+        const data = await res.json();
+        jobId = data.job_id;
+      } catch (err) {
+        showError('Failed to start conversion: ' + err.message);
+        return;
+      }
+
+      progressSection.style.display = 'block';
+      progressText.textContent = 'Fetching Spotify playlist…';
+      poll(jobId);
+    });
+
+    function poll(jobId) {
+      const interval = setInterval(async () => {
+        try {
+          const res = await fetch(`/job/${jobId}`);
+          const job = await res.json();
+
+          if (job.total > 0) {
+            const pct = Math.round((job.progress / job.total) * 100);
+            barFill.style.width = pct + '%';
+            progressText.textContent = 'Matching songs…';
+            progressCount.textContent = `${job.progress} / ${job.total}`;
+          }
+
+          if (job.status === 'done') {
+            clearInterval(interval);
+            barFill.style.width = '100%';
+            progressText.textContent = 'Done!';
+            progressCount.textContent = '';
+            showResult(job);
+            btn.disabled = false;
+            btn.textContent = 'Convert';
+          } else if (job.status === 'error') {
+            clearInterval(interval);
+            progressSection.style.display = 'none';
+            showError(job.error || 'Unknown error');
+            btn.disabled = false;
+            btn.textContent = 'Convert';
+          }
+        } catch (err) {
+          clearInterval(interval);
+          showError('Lost connection to server.');
+          btn.disabled = false;
+          btn.textContent = 'Convert';
+        }
+      }, 1500);
+    }
+
+    function showResult(job) {
+      resultLink.href = job.result_url;
+      resultSection.style.display = 'block';
+
+      if (job.not_found && job.not_found.length > 0) {
+        notFoundSummary.textContent = `${job.not_found.length} song${job.not_found.length > 1 ? 's' : ''} not found on YouTube Music`;
+        notFoundList.innerHTML = job.not_found.map(s => `<li>${s}</li>`).join('');
+        notFoundDetails.style.display = 'block';
+      }
+    }
+
+    function showError(msg) {
+      errorSection.textContent = 'Error: ' + msg;
+      errorSection.style.display = 'block';
+    }
+  </script>
+</body>
+</html>
