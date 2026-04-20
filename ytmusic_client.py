@@ -2,7 +2,7 @@ import os
 from ytmusicapi import YTMusic, OAuthCredentials
 from dotenv import load_dotenv
 
-load_dotenv()
+load_dotenv(override=True)
 
 OAUTH_FILE = "oauth.json"
 _yt = None

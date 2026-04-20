@@ -15,59 +15,37 @@ def _extract_playlist_id(url: str) -> str:
     return match.group(1)
 
 
-def _get_tracks_from_data(data: dict) -> tuple[str, list]:
-    """Navigate __NEXT_DATA__ JSON to extract playlist name and track items."""
-    try:
-        playlist = data["props"]["pageProps"]["state"]["data"]["playlist"]
-    except KeyError:
-        raise RuntimeError(
-            "Unexpected __NEXT_DATA__ structure — Spotify may have changed their page format"
-        )
-    name = playlist["name"]
-    items = playlist.get("tracks", {}).get("items", [])
-    return name, items
-
-
-def _parse_track(item: dict, position: int) -> dict | None:
-    track = item.get("track") or {}
-
-    # Newer Spotify page format wraps data under itemV2
-    if not track:
-        item_v2 = item.get("itemV2") or {}
-        track = item_v2.get("data") or {}
-
-    song_name = track.get("name", "")
-    if not song_name:
-        return None
-
-    # Artists can be a list of dicts or nested under trackUnion
-    artists = track.get("artists") or track.get("trackUnion", {}).get("artists", {}).get("items", [])
-    artist = artists[0].get("name", "") if artists else ""
-
-    return {"name": song_name, "artist": artist, "position": position}
-
-
 def fetch_playlist(url: str) -> tuple[str, list[dict]]:
-    """Return (playlist_name, tracks) by scraping the public Spotify playlist page."""
+    """Return (playlist_name, tracks) by scraping the Spotify embed page."""
     playlist_id = _extract_playlist_id(url)
-    page_url = f"https://open.spotify.com/playlist/{playlist_id}"
+    embed_url = f"https://open.spotify.com/embed/playlist/{playlist_id}"
 
-    resp = requests.get(page_url, headers=_HEADERS, timeout=15)
+    resp = requests.get(embed_url, headers=_HEADERS, timeout=15)
     if resp.status_code == 404:
         raise ValueError("Playlist not found — make sure it's public and the URL is correct")
     resp.raise_for_status()
 
     match = re.search(r'<script id="__NEXT_DATA__"[^>]*>(.+?)</script>', resp.text, re.DOTALL)
     if not match:
-        raise RuntimeError("Could not find track data in Spotify page — the page format may have changed")
+        raise RuntimeError("Could not find track data in Spotify embed page — the page format may have changed")
 
     data = json.loads(match.group(1))
-    playlist_name, items = _get_tracks_from_data(data)
+    try:
+        entity = data["props"]["pageProps"]["state"]["data"]["entity"]
+    except KeyError:
+        raise RuntimeError("Unexpected embed page structure — Spotify may have changed their format")
+
+    playlist_name = entity.get("name") or entity.get("title", "Spotify Playlist")
+    track_list = entity.get("trackList", [])
 
     tracks = []
-    for i, item in enumerate(items):
-        track = _parse_track(item, i + 1)
-        if track:
-            tracks.append(track)
+    for i, item in enumerate(track_list):
+        title = item.get("title", "")
+        if not title:
+            continue
+        # subtitle is "Artist1,\xa0Artist2" for multi-artist tracks; take only the first
+        subtitle = item.get("subtitle", "")
+        artist = re.split(r",\s*\xa0|,\s+", subtitle)[0].strip()
+        tracks.append({"name": title, "artist": artist, "position": i + 1})
 
     return playlist_name, tracks
