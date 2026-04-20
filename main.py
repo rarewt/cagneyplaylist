@@ -1,3 +1,4 @@
+import re
 import uuid
 import time
 import threading
@@ -67,18 +68,25 @@ def _run_conversion(job_id: str, spotify_url: str) -> None:
         job["progress"] += 1
         time.sleep(0.15)
 
-    safe_name = (playlist_name or "").strip().replace("<", "").replace(">", "")[:150] or "Spotify Playlist"
+    # strip control chars and characters YouTube Music rejects in playlist titles
+    safe_name = re.sub(r'[\x00-\x1f\x7f<>]', '', (playlist_name or "").strip())[:150] or "Spotify Playlist"
     # deduplicate while preserving order (duplicate videoIds cause add_playlist_items to 400)
     seen: set[str] = set()
     video_ids = [v for v in video_ids if not (v in seen or seen.add(v))]
-    try:
-        playlist_id = create_playlist(
-            safe_name,
-            f"Imported from Spotify: {spotify_url}"[:500],
-        )
-    except Exception as exc:
+    playlist_id = None
+    for name_attempt, privacy_attempt in [
+        (safe_name, "PRIVATE"),
+        ("Spotify Playlist", "PRIVATE"),
+        ("Spotify Playlist", "PUBLIC"),
+    ]:
+        try:
+            playlist_id = create_playlist(name_attempt, "", privacy_status=privacy_attempt)
+            break
+        except Exception:
+            continue
+    if playlist_id is None:
         job["status"] = "error"
-        job["error"] = f"Failed to create YouTube Music playlist: {exc}"
+        job["error"] = "Failed to create YouTube Music playlist — OAuth token may be expired (re-run setup_ytmusic.py)"
         return
 
     try:

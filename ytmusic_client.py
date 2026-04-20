@@ -31,10 +31,10 @@ def search_song(name: str, artist: str) -> str | None:
     return None
 
 
-def create_playlist(name: str, description: str = "") -> str:
+def create_playlist(name: str, description: str = "", privacy_status: str = "PRIVATE") -> str:
     """Return the new playlistId."""
     yt = _client()
-    return yt.create_playlist(name, description)
+    return yt.create_playlist(name, description, privacy_status=privacy_status)
 
 
 def add_tracks(playlist_id: str, video_ids: list[str]) -> None:
